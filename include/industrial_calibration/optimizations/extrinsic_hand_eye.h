@@ -84,64 +84,6 @@ using namespace industrial_calibration;
 namespace YAML
 {
 template <>
-struct convert<ExtrinsicHandEyeProblem2D3D>
-{
-  using T = ExtrinsicHandEyeProblem2D3D;
-
-  static Node encode(const T& rhs)
-  {
-    Node node;
-
-    node["intr"] = rhs.intr;
-    node["camera_mount_to_camera_guess"] = rhs.camera_mount_to_camera_guess;
-    node["target_mount_to_target_guess"] = rhs.target_mount_to_target_guess;
-    node["observations"] = rhs.observations;
-
-    return node;
-  }
-
-  static bool decode(const Node& node, T& rhs)
-  {
-    rhs.intr = getMember<decltype(rhs.intr)>(node, "intr");
-    rhs.camera_mount_to_camera_guess = getMember<decltype(rhs.camera_mount_to_camera_guess)>(node, "camera_mount_to_"
-                                                                                                   "camera_guess");
-    rhs.target_mount_to_target_guess = getMember<decltype(rhs.target_mount_to_target_guess)>(node, "target_mount_to_"
-                                                                                                   "target_guess");
-    rhs.observations = getMember<decltype(rhs.observations)>(node, "observations");
-
-    return true;
-  }
-};
-
-template <>
-struct convert<ExtrinsicHandEyeProblem3D3D>
-{
-  using T = ExtrinsicHandEyeProblem3D3D;
-
-  static Node encode(const T& rhs)
-  {
-    Node node;
-
-    node["camera_mount_to_camera_guess"] = rhs.camera_mount_to_camera_guess;
-    node["target_mount_to_target_guess"] = rhs.target_mount_to_target_guess;
-    node["observations"] = rhs.observations;
-
-    return node;
-  }
-
-  static bool decode(const Node& node, T& rhs)
-  {
-    rhs.camera_mount_to_camera_guess = getMember<decltype(rhs.camera_mount_to_camera_guess)>(node, "camera_mount_to_"
-                                                                                                   "camera_guess");
-    rhs.target_mount_to_target_guess = getMember<decltype(rhs.target_mount_to_target_guess)>(node, "target_mount_to_"
-                                                                                                   "target_guess");
-    rhs.observations = getMember<decltype(rhs.observations)>(node, "observations");
-
-    return true;
-  }
-};
-
-template <>
 struct convert<ExtrinsicHandEyeResult>
 {
   using T = ExtrinsicHandEyeResult;
@@ -160,23 +102,6 @@ struct convert<ExtrinsicHandEyeResult>
     node["camera_mount_to_camera_rpy"] =
         Eigen::Vector3d(rhs.camera_mount_to_camera.rotation().eulerAngles(2, 1, 0).reverse());
     return node;
-  }
-
-  static bool decode(const YAML::Node& node, T& rhs)
-  {
-    rhs.converged = getMember<decltype(rhs.converged)>(node, "converged");
-    rhs.initial_cost_per_obs = getMember<decltype(rhs.initial_cost_per_obs)>(node, "initial_cost_per_obs");
-    rhs.final_cost_per_obs = getMember<decltype(rhs.final_cost_per_obs)>(node, "final_cost_per_obs");
-
-    Eigen::Vector3d target_mount_to_target_pos = getMember<Eigen::Vector3d>(node, "target_mount_to_target_pos");
-    Eigen::Vector3d target_mount_to_target_rpy = getMember<Eigen::Vector3d>(node, "target_mount_to_target_rpy");
-    rhs.target_mount_to_target = toIsometry<double>(target_mount_to_target_pos, target_mount_to_target_rpy.reverse());
-
-    Eigen::Vector3d camera_mount_to_camera_pos = getMember<Eigen::Vector3d>(node, "camera_mount_to_camera_pos");
-    Eigen::Vector3d camera_mount_to_camera_rpy = getMember<Eigen::Vector3d>(node, "camera_mount_to_camera_rpy");
-    rhs.camera_mount_to_camera = toIsometry<double>(camera_mount_to_camera_pos, camera_mount_to_camera_rpy.reverse());
-
-    return true;
   }
 };
 
