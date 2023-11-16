@@ -133,4 +133,16 @@ cv::Mat CharucoGridBoardTargetFinder::drawTargetFeatures(const cv::Mat& image,
   return image;
 }
 
+TargetFinder::ConstPtr CharucoGridTargetFinderFactory::create(const YAML::Node& config) const
+{
+  auto cols = getMember<int>(config, "cols");
+  auto rows = getMember<int>(config, "rows");
+  auto chessboard_dim = getMember<float>(config, "chessboard_dim");
+  auto aruco_marker_dim = getMember<float>(config, "aruco_marker_dim");
+  auto dictionary = getMember<int>(config, "dictionary");
+
+  CharucoGridTarget target(rows, cols, chessboard_dim, aruco_marker_dim, dictionary);
+  return std::make_shared<const CharucoGridBoardTargetFinder>(target);
+}
+
 }  // namespace industrial_calibration

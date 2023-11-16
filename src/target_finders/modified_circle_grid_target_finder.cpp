@@ -498,4 +498,24 @@ cv::Mat ModifiedCircleGridTargetFinder::drawTargetFeatures(const cv::Mat& image,
   return renderObservations(out_image, cv_obs, target_);
 }
 
+TargetFinder::ConstPtr ModifiedCircleGridTargetFinderFactory::create(const YAML::Node& config) const
+{
+  int rows = getMember<int>(config, "rows");
+  int cols = getMember<int>(config, "cols");
+  double spacing = getMember<double>(config, "spacing");
+  ModifiedCircleGridTarget target(rows, cols, spacing);
+
+  TargetFinder::ConstPtr finder;
+  if (config["circle_detector_params"])
+  {
+    finder = std::make_shared<const ModifiedCircleGridTargetFinder>(target, getMember<CircleDetectorParams>(config, "circle_detector_params"));
+  }
+  else
+  {
+    finder = std::make_unique<const ModifiedCircleGridTargetFinder>(target);
+  }
+
+  return finder;
+}
+
 }  // namespace industrial_calibration
