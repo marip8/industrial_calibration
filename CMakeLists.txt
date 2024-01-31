@@ -30,5 +30,9 @@ endif()
 add_subdirectory(examples)
 list(APPEND SUPPORTED_COMPONENTS examples)
 
+# Industrial Calibration Widget
+add_subdirectory(widget)
+list(APPEND SUPPORTED_COMPONENTS widget)
+
 # Package configuration
 configure_package(SUPPORTED_COMPONENTS ${SUPPORTED_COMPONENTS})
