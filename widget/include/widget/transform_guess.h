@@ -17,7 +17,7 @@ public:
   ~TransformGuess();
 
   void configure(const YAML::Node& node);
-  YAML::Node save();
+  YAML::Node getConfig();
 
 private:
   Ui::TransformGuess *ui_;

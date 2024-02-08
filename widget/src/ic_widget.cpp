@@ -7,7 +7,10 @@
 #include <QFileDialog>
 #include <QDir>
 #include <QFile>
+#include <QPixmap>
 #include <fstream>
+#include <boost_plugin_loader/plugin_loader.hpp> 
+#include "industrial_calibration/serialization.h"
 #include "widget/transform_guess.h"
 #include "widget/camera_intrinsics.h"
 #include "widget/charuco_target.h"
@@ -124,25 +127,27 @@ void ICWidget::loadConfig()
 
   {
     // Target
-    std::string type = node["target_finder"]["type"].as<std::string>();
+    YAML::Node target_finder_config = node["target_finder"];
+    std::string type = target_finder_config["type"].as<std::string>();
+    
     // Target combo box: Charuco -> 0, Aruco -> 1, Circle -> 2
     if (type == "CharucoGridTargetFinder")
     {
       ui_->targetComboBox->setCurrentIndex(0);
       auto dialog = dynamic_cast<ICDialog<CharucoTarget>*>(charuco_target_dialog_);
-      dialog->widget->configure(node["target_finder"]);
+      dialog->widget->configure(target_finder_config);
     }
     else if(type == "ArucoGridTargetFinder")
     {
       ui_->targetComboBox->setCurrentIndex(1);
       auto dialog = dynamic_cast<ICDialog<ArucoTarget>*>(aruco_target_dialog_);
-      dialog->widget->configure(node["target_finder"]);
+      dialog->widget->configure(target_finder_config);
     }
     else if(type == "ModifiedCircleGridTargetFinder")
     { 
       ui_->targetComboBox->setCurrentIndex(2);
       auto dialog = dynamic_cast<ICDialog<CircleTarget>*>(circle_target_dialog_);
-      dialog->widget->configure(node["target_finder"]);
+      dialog->widget->configure(target_finder_config);
     }
     else
     {
@@ -170,19 +175,19 @@ void ICWidget::saveConfig()
   {
     // Camera intrinsics
     auto dialog = dynamic_cast<ICDialog<CameraIntrinsics>*>(camera_intrinsics_dialog_);
-    node["intrinsics"] = dialog->widget->save();
+    node["intrinsics"] = dialog->widget->getConfig();
   }
 
   {
     // Camera guess
     auto dialog = dynamic_cast<ICDialog<TransformGuess>*>(camera_transform_guess_dialog_);
-    node["camera_mount_to_camera_guess"] = dialog->widget->save();
+    node["camera_mount_to_camera_guess"] = dialog->widget->getConfig();
   }
 
   {
     // Target guess
     auto dialog = dynamic_cast<ICDialog<TransformGuess>*>(target_transform_guess_dialog_);
-    node["target_mount_to_target_guess"] = dialog->widget->save();
+    node["target_mount_to_target_guess"] = dialog->widget->getConfig();
   }
 
   // Homography
@@ -194,17 +199,17 @@ void ICWidget::saveConfig()
     if (type == "CharucoGridTargetFinder")
     {
       auto dialog = dynamic_cast<ICDialog<CharucoTarget>*>(charuco_target_dialog_);
-      node["target_finder"] = dialog->widget->save();
+      node["target_finder"] = dialog->widget->getConfig();
     }
     else if(type == "ArucoGridTargetFinder")
     {
       auto dialog = dynamic_cast<ICDialog<ArucoTarget>*>(aruco_target_dialog_);
-      node["target_finder"] = dialog->widget->save();
+      node["target_finder"] = dialog->widget->getConfig();
     }
     else
     { 
       auto dialog = dynamic_cast<ICDialog<CircleTarget>*>(circle_target_dialog_);
-      node["target_finder"] = dialog->widget->save();
+      node["target_finder"] = dialog->widget->getConfig();
     }
 
   }
@@ -220,38 +225,57 @@ void ICWidget::updateProgressBar()
   ui_->progressBar->setValue(ui_->progressBar->value()+1);
 }
 
-void ICWidget::drawImage(const QString& filepath)
+void ICWidget::drawImage(const QPixmap& image)
 {
-  QFile file(filepath);
-  if (!file.exists())
-  {
-    updateLog(filepath + " is invalid");
-    return;
-  }
-
-  ui_->imageWidget->setImage(filepath);
-  update();
-
-  // Call update progress somewhere else if also loading pose data?
-  updateProgressBar();
-  
+  ui_->imageWidget->setImage(image);
+  update();  
 }
 
 void ICWidget::getNextSample()
 {
+  // Check if directory has been provided
   if (data_dir.isNull())
   {
     updateLog("Path to data folder is null, specify the directory using the 'Calibrate' button");
+    return;
   }
-  else if (ui_->progressBar->value() == ui_->progressBar->maximum())
+  
+  // Check if all images have been reviewed
+  if (ui_->progressBar->value() == ui_->progressBar->maximum())
   {
     updateLog("All " + QString::number(ui_->progressBar->maximum()) + " images previewed. STAHP IT!");
-  } 
-  else
-  {
-    const QString img_path = data_dir + "/images/" + QString::number(ui_->progressBar->value()) + ".png";
-    drawImage(img_path);
+    return;
   }
+
+  const QString img_path = data_dir + "/images/" + QString::number(ui_->progressBar->value()) + ".png";
+  
+  // Check image exists
+  QFile file(img_path);
+  if (!file.exists())
+  {
+    updateLog("Failed to load image: '" + img_path + "' does not exist");
+    return;
+  } 
+  
+  // Detect image
+  cv::Mat image = cv::imread(img_path.toStdString());
+  cv::Mat image_detected = getImageDetected(image);
+
+  
+  // Convert cv::mat to QPixmap
+  QPixmap image_to_draw = QPixmap::fromImage(QImage (image_detected.data, 
+                                              image_detected.cols, 
+                                              image_detected.rows, 
+                                              image_detected.step, 
+                                              QImage::Format_RGB888).rgbSwapped());
+  
+  // Draw image detected
+  drawImage(image_to_draw);
+
+  // Calc homography
+
+  // Update progress
+  updateProgressBar();
   
 }
 
@@ -261,6 +285,7 @@ void ICWidget::calibrate()
   const QString home = QStandardPaths::standardLocations(QStandardPaths::HomeLocation).at(0);
   const QString dir = QFileDialog::getExistingDirectory(this, "Select data directory", home);
 
+  // Check directory exists
   if (dir.isNull())
   {
     updateLog("Invalid directory, path is null");
@@ -278,8 +303,50 @@ void ICWidget::calibrate()
   ui_->progressBar->setMinimum(0);
   ui_->progressBar->setValue(0);
   
+  // Load target finder
+  loadTargetFinder();
+
   // Show first image
-  drawImage(data_dir + "/images" + "/0.png");
+  getNextSample();
+  
+}
+
+void ICWidget::loadTargetFinder()
+{
+  boost_plugin_loader::PluginLoader loader;
+  loader.search_libraries.insert(INDUSTRIAL_CALIBRATION_PLUGIN_LIBRARIES);
+  loader.search_libraries_env = INDUSTRIAL_CALIBRATION_SEARCH_LIBRARIES_ENV;
+
+  // Get target type and currentconfig
+  QString type = ui_->targetComboBox->currentText();
+  YAML::Node target_finder_config;
+
+  if (type == "CharucoGridTargetFinder")
+  {
+    auto dialog = dynamic_cast<ICDialog<CharucoTarget>*>(charuco_target_dialog_);
+    target_finder_config = dialog->widget->getConfig();
+  }
+  else if(type == "ArucoGridTargetFinder")
+  {
+    auto dialog = dynamic_cast<ICDialog<ArucoTarget>*>(aruco_target_dialog_);
+    target_finder_config = dialog->widget->getConfig();
+  }
+  else
+  { 
+    auto dialog = dynamic_cast<ICDialog<CircleTarget>*>(circle_target_dialog_);
+    target_finder_config = dialog->widget->getConfig();
+  }
+
+  auto factory = loader.createInstance<industrial_calibration::TargetFinderFactory>(getMember<std::string>(target_finder_config, "type"));
+  target_finder_ = factory->create(target_finder_config);
+}
+
+cv::Mat ICWidget::getImageDetected(const cv::Mat& image)
+{
+  industrial_calibration::TargetFeatures target_features = target_finder_->findTargetFeatures(image);
+  cv::Mat image_detected = target_finder_->drawTargetFeatures(image, target_features);
+  
+  return image_detected;
 }
 
 void ICWidget::saveResults()

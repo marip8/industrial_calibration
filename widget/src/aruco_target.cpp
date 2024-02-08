@@ -21,7 +21,7 @@ void ArucoTarget::configure(const YAML::Node& node)
   ui_->dictComboBox->setCurrentIndex(node["dictionary"].as<int>());
 }
 
-YAML::Node ArucoTarget::save()
+YAML::Node ArucoTarget::getConfig()
 {
   YAML::Node node;
   node["type"] = "ArucoGridTargetFinder";

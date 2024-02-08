@@ -32,7 +32,8 @@ target_include_directories(${PROJECT_NAME}_widget PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>")
 target_link_libraries(${PROJECT_NAME}_widget PUBLIC
-  Qt5::Widgets 
+  Qt5::Widgets
+  boost_plugin_loader::boost_plugin_loader 
   ${PROJECT_NAME})
 
 # add executable for widget

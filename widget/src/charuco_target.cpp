@@ -22,7 +22,7 @@ void CharucoTarget::configure(const YAML::Node& node)
   ui_->dictComboBox->setCurrentIndex(node["dictionary"].as<int>());
 }
 
-YAML::Node CharucoTarget::save()
+YAML::Node CharucoTarget::getConfig()
 {
   YAML::Node node;
   node["type"] = "CharucoGridTargetFinder";

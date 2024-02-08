@@ -21,7 +21,7 @@ void CameraIntrinsics::configure(const YAML::Node& node)
   ui_->cyDoubleSpinBox->setValue(node["cy"].as<double>());
 }
 
-YAML::Node CameraIntrinsics::save()
+YAML::Node CameraIntrinsics::getConfig()
 {
   YAML::Node node;
   node["fx"] = ui_->fxDoubleSpinBox->value();

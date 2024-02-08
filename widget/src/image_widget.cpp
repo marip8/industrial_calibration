@@ -8,9 +8,9 @@ ImageWidget::ImageWidget(QWidget* parent) : QWidget(parent)
   image_scaled_ = image_original_;
 }
   
-void ImageWidget::setImage(const QString& filepath)
+void ImageWidget::setImage(const QPixmap& image)
 {
-  image_original_.load(filepath);
+  image_original_ = image;
   image_scaled_ = image_original_;
 }
   

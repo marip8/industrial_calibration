@@ -2,6 +2,9 @@
 #define IC_WIDGET_H
 
 #include <QWidget>
+#include <yaml-cpp/yaml.h>
+#include <opencv2/opencv.hpp>
+#include "industrial_calibration/target_finders/target_finder.h"
 
 class QDialog;
 class QAbstractButton;
@@ -24,8 +27,10 @@ private:
   void loadConfig();
   void saveConfig();
   void calibrate();
+  void loadTargetFinder();
+  cv::Mat getImageDetected(const cv::Mat& image);
   void updateProgressBar();
-  void drawImage(const QString& filepath);
+  void drawImage(const QPixmap& image);
   void getNextSample();
   void saveResults();
   void updateLog(const QString& message);
@@ -37,7 +42,8 @@ private:
   QDialog* aruco_target_dialog_;
   QDialog* circle_target_dialog_;
   QString data_dir;
-
+  
+  industrial_calibration::TargetFinder::ConstPtr target_finder_;
 };
 
 #endif // IC_WIDGET_H

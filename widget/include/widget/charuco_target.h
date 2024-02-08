@@ -17,7 +17,7 @@ public:
   ~CharucoTarget();
 
   void configure(const YAML::Node& node);
-  YAML::Node save();
+  YAML::Node getConfig();
 
 private:
   Ui::CharucoTarget *ui_;

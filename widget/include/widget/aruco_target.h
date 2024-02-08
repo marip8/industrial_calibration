@@ -17,7 +17,7 @@ public:
   ~ArucoTarget();
 
   void configure(const YAML::Node& node);
-  YAML::Node save();
+  YAML::Node getConfig();
 
 private:
   Ui::ArucoTarget *ui_;

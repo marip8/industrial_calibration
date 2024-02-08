@@ -11,7 +11,7 @@ class ImageWidget : public QWidget
 public:
   ImageWidget(QWidget *parent = nullptr);
 
-  void setImage(const QString& filepath);
+  void setImage(const QPixmap& image);
 
 protected:
   void paintEvent(QPaintEvent *event) override;

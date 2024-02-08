@@ -51,7 +51,7 @@ void CircleTarget::configure(const YAML::Node& node)
   ui_->maxConvexityDoubleSpinBox->setValue(subnode["maxConvexity"].as<double>());
 }
 
-YAML::Node CircleTarget::save()
+YAML::Node CircleTarget::getConfig()
 {
   YAML::Node node;
   node["type"] = "ModifiedCircleGridTargetFinder";

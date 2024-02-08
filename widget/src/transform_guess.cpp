@@ -36,7 +36,7 @@ void TransformGuess::configure(const YAML::Node& node)
   ui_->yawDoubleSpinBox->setValue(euler[2]);
 }
 
-YAML::Node TransformGuess::save()
+YAML::Node TransformGuess::getConfig()
 {
   YAML::Node node;
   node["x"] = ui_->xDoubleSpinBox->value();
