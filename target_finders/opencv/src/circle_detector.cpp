@@ -387,7 +387,7 @@ cv::Mat CircleDetector::drawDetectedCircles(const cv::Mat& image)
   const std::vector<DetectionResult> results = applyThresholds(grayscale_image, params);
 
   // Output
-  cv::Mat output = image.clone();
+  cv::Mat output = image.clone(); // clone to prevent changing original image
 
   // Draw the contours on the image
   const cv::Scalar color(255, 0, 0);

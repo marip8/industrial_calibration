@@ -9,14 +9,19 @@
 #include <QFile>
 #include <QPixmap>
 #include <fstream>
+#include <filesystem>
 #include <boost_plugin_loader/plugin_loader.hpp> 
+#include "industrial_calibration/utils.h"
 #include "industrial_calibration/serialization.h"
+#include "industrial_calibration/optimizations/analysis/homography_analysis.h"
 #include "widget/transform_guess.h"
 #include "widget/camera_intrinsics.h"
 #include "widget/charuco_target.h"
 #include "widget/aruco_target.h"
 #include "widget/circle_target.h"
 #include "widget/image_widget.h"
+
+static const unsigned RANDOM_SEED = 1;
 
 template<typename WidgetT>
 class ICDialog : public QDialog
@@ -57,7 +62,7 @@ ICWidget::ICWidget(QWidget *parent) :
   connect(ui_->loadConfigPushButton, &QPushButton::clicked, this, &ICWidget::loadConfig);
   connect(ui_->saveConfigPushButton, &QPushButton::clicked, this, &ICWidget::saveConfig);
   connect(ui_->nextPushButton, &QPushButton::clicked, this, &ICWidget::getNextSample);
-  connect(ui_->calibratePushButton, &QPushButton::clicked, this, &ICWidget::calibrate);
+  connect(ui_->beginCalibrationPushButton, &QPushButton::clicked, this, &ICWidget::calibrate);
   connect(ui_->saveResultsPushButton, &QPushButton::clicked, this, &ICWidget::saveResults);
 
   // Set up dialog boxes
@@ -94,14 +99,19 @@ void ICWidget::loadConfig()
 {
   // Get yaml filepath
   const QString home = QStandardPaths::standardLocations(QStandardPaths::HomeLocation).at(0);
-  const QString file = QFileDialog::getOpenFileName(this, "Load calibration config", home, "YAML files (*.yaml *.yml)");
-  if (file.isNull())
+  const QString qFilePath = QFileDialog::getOpenFileName(this, "Load calibration config", home, "YAML files (*.yaml *.yml)");
+  if (qFilePath.isNull())
   {
     updateLog("Unable to load file, filepath is null");
     return;
   }
-  ui_->configLineEdit->setText(file);
-  YAML::Node node = YAML::LoadFile(file.toStdString());
+  ui_->configLineEdit->setText(qFilePath);
+  
+  std::filesystem::path path(qFilePath.toStdString());
+  std::filesystem::path parent_path = path.parent_path();
+  data_dir = QString::fromStdString(parent_path.string());
+
+  YAML::Node node = YAML::LoadFile(qFilePath.toStdString());
   
   // Load parameters
   {
@@ -155,8 +165,36 @@ void ICWidget::loadConfig()
       return;
     }
 
+    // Sensor configuration (historically industrical calibration yaml files don't include this)
+    if(node["sensor_configuration"])
+    {
+      if(node["sensor_configuration"].as<std::string>() == "eye-to-hand")
+      {
+        ui_->sensorConfigComboBox->setCurrentIndex(0);
+      }
+      else if (node["sensor_configuration"].as<std::string>() == "eye-in-hand")
+      {
+        ui_->sensorConfigComboBox->setCurrentIndex(1);
+      }
+      else
+      {
+        ui_->sensorConfigComboBox->setCurrentIndex(0);
+        updateLog("Unrecoginized sensor config: " + 
+          QString::fromStdString(node["sensor_configuration"].as<std::string>()) + 
+          " Defaulting to: " + 
+          ui_->sensorConfigComboBox->currentText());
+      }
+      
+    }
+    else
+    {
+      ui_->sensorConfigComboBox->setCurrentIndex(0);
+      updateLog("No 'sensor_configuration' specified in config file. Defaulting to: " 
+      + ui_->sensorConfigComboBox->currentText());
+    }
+
   }
-  updateLog("Calibration config loaded from: " + file);
+  updateLog("Calibration config loaded from: " + qFilePath);
 }
 
 void ICWidget::saveConfig()
@@ -212,6 +250,8 @@ void ICWidget::saveConfig()
       node["target_finder"] = dialog->widget->getConfig();
     }
 
+  node["sensor_configuration"] = ui_->sensorConfigComboBox->currentText().toStdString();
+
   }
   std::ofstream fout(file.toStdString());
   fout << node;
@@ -240,39 +280,69 @@ void ICWidget::getNextSample()
     return;
   }
   
-  // Check if all images have been reviewed
+  // Check if all data has been reviewed
   if (ui_->progressBar->value() == ui_->progressBar->maximum())
   {
-    updateLog("All " + QString::number(ui_->progressBar->maximum()) + " images previewed. STAHP IT!");
+    updateLog("All " + QString::number(ui_->progressBar->maximum()) + " images and poses previewed. STAHP IT!");
     return;
   }
 
   const QString img_path = data_dir + "/images/" + QString::number(ui_->progressBar->value()) + ".png";
+  const QString pose_path = data_dir + "/poses/" + QString::number(ui_->progressBar->value()) + ".yaml";
   
-  // Check image exists
-  QFile file(img_path);
-  if (!file.exists())
+  // Check image and pose exists (replace with function to reduce copy pasted code)
   {
-    updateLog("Failed to load image: '" + img_path + "' does not exist");
-    return;
-  } 
-  
-  // Detect image
-  cv::Mat image = cv::imread(img_path.toStdString());
-  cv::Mat image_detected = getImageDetected(image);
+    QFile file(img_path);
+    if (!file.exists())
+    {
+      updateLog("Failed to load image: '" + img_path + "' does not exist");
+      return;
+    } 
+  }
 
-  
-  // Convert cv::mat to QPixmap
-  QPixmap image_to_draw = QPixmap::fromImage(QImage (image_detected.data, 
-                                              image_detected.cols, 
-                                              image_detected.rows, 
-                                              image_detected.step, 
-                                              QImage::Format_RGB888).rgbSwapped());
-  
-  // Draw image detected
-  drawImage(image_to_draw);
+  {
+    QFile file(pose_path);
+    if (!file.exists())
+    {
+      updateLog("Failed to load pose: '" + pose_path + "' does not exist");
+      return;
+    } 
+  }
 
-  // Calc homography
+  try 
+  {
+    // Detect image
+    cv::Mat image = cv::imread(img_path.toStdString());
+    cv::Mat image_detected = getImageDetected(image);
+
+    // Convert cv::mat to QPixmap
+    QPixmap image_to_draw = QPixmap::fromImage(QImage (image_detected.data, 
+                                                image_detected.cols, 
+                                                image_detected.rows, 
+                                                image_detected.step, 
+                                                QImage::Format_RGB888).rgbSwapped());
+
+    // Draw image detected
+    drawImage(image_to_draw);
+
+    // Get pose
+    Eigen::Isometry3d pose = YAML::LoadFile(pose_path.toStdString()).as<Eigen::Isometry3d>();
+
+    // Calculate homography error
+    auto correspondence_set = target_finder_->findCorrespondences(image);
+  
+    industrial_calibration::RandomCorrespondenceSampler random_sampler(correspondence_set.size(), correspondence_set.size() / 3,
+                                            RANDOM_SEED);
+
+    Eigen::VectorXd homography_error = industrial_calibration::calculateHomographyError(correspondence_set, random_sampler);
+    if (homography_error.array().mean() > ui_->homographyDoubleSpinBox->value())
+       updateLog("Homography error exceeds threshold (" + QString::number(homography_error.array().mean()) + ")");
+  
+  }
+  catch (const std::exception& ex)
+  {
+    updateLog(ex.what());
+  }
 
   // Update progress
   updateProgressBar();
@@ -281,17 +351,20 @@ void ICWidget::getNextSample()
 
 void ICWidget::calibrate()
 {
-  // Provide directory or provide YAML with absolute/relative paths to data or both YAML and directory?
-  const QString home = QStandardPaths::standardLocations(QStandardPaths::HomeLocation).at(0);
-  const QString dir = QFileDialog::getExistingDirectory(this, "Select data directory", home);
-
-  // Check directory exists
-  if (dir.isNull())
+  if (data_dir.isNull())
   {
-    updateLog("Invalid directory, path is null");
-    return;
+    // Provide directory or provide YAML with absolute/relative paths to data or both YAML and directory?
+    const QString home = QStandardPaths::standardLocations(QStandardPaths::HomeLocation).at(0);
+    const QString dir = QFileDialog::getExistingDirectory(this, "Select data directory", home);
+
+    // Check directory exists
+    if (dir.isNull())
+    {
+      updateLog("Invalid directory, path is null");
+      return;
+    }
+    data_dir = dir;
   }
-  data_dir = dir;
 
   updateLog("Opened directory: " + data_dir);
 

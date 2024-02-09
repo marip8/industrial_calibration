@@ -129,9 +129,10 @@ cv::Mat CharucoGridBoardTargetFinder::drawTargetFeatures(const cv::Mat& image,
   }
 
   // Draw the detected corners
-  cv::aruco::drawDetectedCornersCharuco(image, charuco_corners, charuco_ids, cv::Scalar(255, 0, 0));
+  cv::Mat new_image = image.clone(); // clone to prevent changing original image
+  cv::aruco::drawDetectedCornersCharuco(new_image, charuco_corners, charuco_ids, cv::Scalar(255, 0, 0));
 
-  return image;
+  return new_image;
 }
 
 TargetFinderOpenCV::ConstPtr CharucoGridTargetFinderFactory::create(const YAML::Node& config) const

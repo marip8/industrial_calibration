@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1100</width>
-    <height>668</height>
+    <width>1109</width>
+    <height>744</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -184,6 +184,29 @@
            </widget>
           </item>
           <item>
+           <widget class="QGroupBox" name="groupBox_6">
+            <property name="title">
+             <string>Sensor Configuration</string>
+            </property>
+            <layout class="QHBoxLayout" name="horizontalLayout_10">
+             <item>
+              <widget class="QComboBox" name="sensorConfigComboBox">
+               <item>
+                <property name="text">
+                 <string>eye-to-hand</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>eye-in-hand</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
            <widget class="Line" name="line_2">
             <property name="orientation">
              <enum>Qt::Horizontal</enum>
@@ -207,9 +230,9 @@
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_7">
           <item>
-           <widget class="QPushButton" name="calibratePushButton">
+           <widget class="QPushButton" name="beginCalibrationPushButton">
             <property name="text">
-             <string>Calibrate</string>
+             <string>Begin Calibration</string>
             </property>
            </widget>
           </item>
@@ -259,8 +282,6 @@
     </widget>
    </item>
   </layout>
-  <zorder>imageWidget</zorder>
-  <zorder>splitter</zorder>
  </widget>
  <customwidgets>
   <customwidget>

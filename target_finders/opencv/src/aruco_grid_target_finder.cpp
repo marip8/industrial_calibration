@@ -120,8 +120,9 @@ cv::Mat ArucoGridBoardTargetFinder::drawTargetFeatures(const cv::Mat& image,
                    [](const Eigen::Vector2d& o) { return cv::Point2d(o.x(), o.y()); });
     marker_corners.push_back(cv_obs);
   }
-  cv::aruco::drawDetectedMarkers(image, marker_corners, marker_ids);
-  return image;
+  cv::Mat new_image = image.clone(); // clone to prevent changing original image
+  cv::aruco::drawDetectedMarkers(new_image, marker_corners, marker_ids);
+  return new_image;
 }
 
 TargetFinderOpenCV::ConstPtr ArucoGridTargetFinderFactory::create(const YAML::Node& config) const
