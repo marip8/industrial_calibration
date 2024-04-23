@@ -4,10 +4,13 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
+find_package(boost_plugin_loader REQUIRED)
 
 # Add widget plugin
 add_library(
   ${PROJECT_NAME}_widget SHARED
+  include/widget/configurable_widget.h
+  src/configurable_widget.cpp
   src/ic_widget.ui
   src/ic_widget.cpp
   include/widget/ic_widget.h
@@ -33,8 +36,9 @@ target_include_directories(${PROJECT_NAME}_widget PUBLIC
   "$<INSTALL_INTERFACE:include>")
 target_link_libraries(${PROJECT_NAME}_widget PUBLIC
   Qt5::Widgets
-  boost_plugin_loader::boost_plugin_loader 
-  ${PROJECT_NAME})
+  boost_plugin_loader::boost_plugin_loader
+  ${PROJECT_NAME}_analysis
+  ${PROJECT_NAME}_target_finders_opencv)
 
 # add executable for widget
 add_executable(${PROJECT_NAME}_app src/ic_app.cpp)
@@ -49,4 +53,4 @@ configure_component(
   COMPONENT gui 
   NAMESPACE industrial_calibration 
   TARGETS ${PROJECT_NAME}_widget ${PROJECT_NAME}_app 
-  DEPENDENCIES Qt5 boost_plugin_loader)
+  DEPENDENCIES "Qt5 REQUIRED COMPONENTS Widgets" boost_plugin_loader)

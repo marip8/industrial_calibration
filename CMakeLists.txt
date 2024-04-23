@@ -32,7 +32,7 @@ list(APPEND SUPPORTED_COMPONENTS examples)
 
 # Industrial Calibration Widget
 add_subdirectory(widget)
-list(APPEND SUPPORTED_COMPONENTS widget)
+list(APPEND SUPPORTED_COMPONENTS gui)
 
 # Package configuration
 configure_package(SUPPORTED_COMPONENTS ${SUPPORTED_COMPONENTS})
