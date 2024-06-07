@@ -2,6 +2,7 @@
 #include <industrial_calibration/optimizations/camera_intrinsic_cost.h>
 #include <industrial_calibration/optimizations/ceres_math_utilities.h>
 #include <industrial_calibration/optimizations/covariance_analysis.h>
+#include <industrial_calibration/optimizations/maximum_likelihood.h>
 #include <industrial_calibration/optimizations/pnp.h>
 #include <industrial_calibration/core/exceptions.h>
 #include <industrial_calibration/core/serialization.h>
@@ -93,6 +94,24 @@ CameraIntrinsicResult optimize(const CameraIntrinsicProblem& params)
 
       problem.AddResidualBlock(cost_block, NULL, internal_poses[i].values.data(), internal_intrinsics_data.data());
     }
+  }
+
+  // Add max likelihood cost for camera center
+  {
+    Eigen::ArrayXXd mean = Eigen::ArrayXXd::Zero(9, 1);
+    mean(2, 0) = params.intrinsics_guess.cx();
+    mean(3, 0) = params.intrinsics_guess.cy();
+    Eigen::ArrayXXd stdev = Eigen::ArrayXXd::Constant(9, 1, std::numeric_limits<double>::infinity());
+    // Camera center should be known to 3 sigma (99.5%) within about 10 pixels
+    // TODO: parameterize this value?
+    stdev(2, 0) = 10.0;
+    stdev(3, 0) = 10.0;
+
+    auto* cost_fn = new MaximumLikelihood(mean, stdev);
+    auto* cost_block = new ceres::DynamicAutoDiffCostFunction<MaximumLikelihood>(cost_fn);
+    cost_block->AddParameterBlock(9);
+    cost_block->SetNumResiduals(9);
+    problem.AddResidualBlock(cost_block, nullptr, internal_intrinsics_data.data());
   }
 
   // Add constraints on the lower bounds of the focal lengths and camera center
