@@ -5,6 +5,7 @@ set(CMAKE_AUTOUIC ON)
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
 find_package(boost_plugin_loader REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common io)
 
 # Add widget plugin
 add_library(
@@ -35,13 +36,15 @@ add_library(
   src/camera_intrinsic_calibration_widget.ui
   src/camera_intrinsic_calibration_widget.cpp)
 target_include_directories(${PROJECT_NAME}_gui PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                                                      "$<INSTALL_INTERFACE:include>")
+                                                      "$<INSTALL_INTERFACE:include>"
+                                                      ${PCL_INCLUDE_DIRS})
 target_link_libraries(
   ${PROJECT_NAME}_gui
   PUBLIC Qt5::Widgets
          boost_plugin_loader::boost_plugin_loader
          ${PROJECT_NAME}_analysis
-         ${PROJECT_NAME}_target_finders_opencv)
+         ${PROJECT_NAME}_target_finders_opencv
+         ${PCL_LIBRARIES})
 
 # Add extrinsic hand-eye calibration application
 add_executable(${PROJECT_NAME}_extrinsic_hand_eye_calibration_app src/app/extrinsic_hand_eye_calibration_app.cpp)

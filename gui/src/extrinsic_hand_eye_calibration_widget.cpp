@@ -26,9 +26,13 @@
 #include <QScrollBar>
 #include <QVBoxLayout>
 
+#include <pcl/io/pcd_io.h>
+#include "point_cloud_circle_finder.hpp"
+
 static const unsigned RANDOM_SEED = 1;
 static const int IMAGE_FILE_NAME_ROLE = Qt::UserRole + 1;
 static const int POSE_FILE_NAME_ROLE = Qt::UserRole + 2;
+static const int CLOUD_FILE_NAME_ROLE = Qt::UserRole + 3;
 static const int IDX_FEATURES = 0;
 static const int IDX_HOMOGRAPHY = 1;
 
@@ -228,11 +232,14 @@ void ExtrinsicHandEyeCalibrationWidget::loadObservations(const std::string& obse
         observations_file_info.absoluteDir().filePath(QString::fromStdString(getMember<std::string>(entry, "image")));
     QString pose_file =
         observations_file_info.absoluteDir().filePath(QString::fromStdString(getMember<std::string>(entry, "pose")));
+    QString cloud_file =
+        observations_file_info.absoluteDir().filePath(QString::fromStdString(getMember<std::string>(entry, "cloud")));
 
     auto item = new QTreeWidgetItem();
     item->setData(0, Qt::EditRole, "Observation " + QString::number(i));
     item->setData(0, IMAGE_FILE_NAME_ROLE, image_file);
     item->setData(0, POSE_FILE_NAME_ROLE, pose_file);
+    item->setData(0, CLOUD_FILE_NAME_ROLE, cloud_file);
 
     // Add a column entry for the number of detected features
     auto features_item = new QTreeWidgetItem(item);
@@ -342,10 +349,9 @@ void ExtrinsicHandEyeCalibrationWidget::calibrate()
   loadTargetFinder();
 
   // Create the calibration problem
-  ExtrinsicHandEyeProblem2D3D problem;
+  ExtrinsicHandEyeProblem3D3D problem;
   problem.camera_mount_to_camera_guess = camera_transform_guess_widget_->save().as<Eigen::Isometry3d>();
   problem.target_mount_to_target_guess = target_transform_guess_widget_->save().as<Eigen::Isometry3d>();
-  problem.intr = camera_intrinsics_widget_->save().as<CameraIntrinsics>();
 
   for (int i = 0; i < ui_->tree_widget_observations->topLevelItemCount(); ++i)
   {
@@ -362,9 +368,16 @@ void ExtrinsicHandEyeCalibrationWidget::calibrate()
     }
 
     QString pose_file = item->data(0, POSE_FILE_NAME_ROLE).value<QString>();
-    if (!QFile(image_file).exists())
+    if (!QFile(pose_file).exists())
     {
       error(item, "Pose file does not exist");
+      continue;
+    }
+
+    QString cloud_file = item->data(0, CLOUD_FILE_NAME_ROLE).value<QString>();
+    if (!QFile(cloud_file).exists())
+    {
+      error(item, "Cloud file does not exist");
       continue;
     }
 
@@ -374,8 +387,11 @@ void ExtrinsicHandEyeCalibrationWidget::calibrate()
       cv::Mat image = cv::imread(image_file.toStdString());
       auto pose = YAML::LoadFile(pose_file.toStdString()).as<Eigen::Isometry3d>();
 
+      pcl::PointCloud<pcl::PointXYZ> cloud;
+      pcl::io::loadPCDFile(cloud_file.toStdString(), cloud);
+
       // Populate an observation
-      Observation2D3D obs;
+      Observation3D3D obs;
       if (ui_->action_static_camera->isChecked())
       {
         obs.to_camera_mount = Eigen::Isometry3d::Identity();
@@ -386,7 +402,9 @@ void ExtrinsicHandEyeCalibrationWidget::calibrate()
         obs.to_camera_mount = pose;
         obs.to_target_mount = Eigen::Isometry3d::Identity();
       }
-      obs.correspondence_set = target_finder_->findCorrespondences(image);
+
+      Correspondence2D3D::Set corrs = target_finder_->findCorrespondences(image);
+      obs.correspondence_set = get3DCorrespondences(cloud, corrs, image.size[1]);
 
       // Calculate homography error
       RandomCorrespondenceSampler random_sampler(obs.correspondence_set.size(), obs.correspondence_set.size() / 3,
@@ -426,14 +444,14 @@ void ExtrinsicHandEyeCalibrationWidget::calibrate()
   ss << result_->covariance.printCorrelationCoeffAboveThreshold(0.5) << std::endl;
 
   // Compute the projected 3D error for comparison
-  ss << analyze3dProjectionError(problem, *result_) << std::endl << std::endl;
+  // ss << analyze3dProjectionError(problem, *result_) << std::endl << std::endl;
 
   // Now let's compare the results of our extrinsic calibration with a PnP optimization for every observation.
   // The PnP optimization will give us an estimate of the camera to target transform using our input camera intrinsic
   // parameters We will then see how much this transform differs from the same transform calculated using the results
   // of the extrinsic calibration
-  ExtrinsicHandEyeAnalysisStats stats = analyzeResults(problem, *result_);
-  ss << stats << std::endl << std::endl;
+  // ExtrinsicHandEyeAnalysisStats stats = analyzeResults(problem, *result_);
+  // ss << stats << std::endl << std::endl;
 
   ui_->text_edit_results->clear();
   ui_->text_edit_results->append(QString::fromStdString(ss.str()));
